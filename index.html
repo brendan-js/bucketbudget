@@ -94,7 +94,7 @@
             padding: 0 15px;
         }
 
-        /* Sync Status Pill - Moved below header content */
+        /* Sync Status Pill - Updated for Manual Push/Pull */
         .sync-wrapper {
             display: flex;
             justify-content: center;
@@ -103,11 +103,11 @@
         
         .sync-pill {
             background: rgba(0, 0, 0, 0.15);
-            padding: 4px 4px 4px 12px;
+            padding: 4px 8px;
             border-radius: 50px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             font-size: 0.8rem;
             color: rgba(255,255,255,0.9);
         }
@@ -116,11 +116,12 @@
             background: rgba(255,255,255,0.2);
             color: white;
             border: none;
-            padding: 4px 10px;
+            padding: 4px 12px;
             border-radius: 20px;
             font-weight: 600;
             font-size: 0.75rem;
             cursor: pointer;
+            transition: background 0.2s;
         }
         .sync-btn:hover { background: rgba(255,255,255,0.3); }
 
@@ -346,8 +347,10 @@
         
         <div class="sync-wrapper">
             <div class="sync-pill" id="sync-status">
-                <span id="sync-text">Local Storage</span>
-                <button class="sync-btn" id="sync-btn" onclick="setupGitHubSync()">Sync</button>
+                <span id="sync-text">GitHub Gist</span>
+                <button class="sync-btn" onclick="syncToGitHub()">Push</button>
+                <button class="sync-btn" onclick="loadFromGitHub()">Pull</button>
+                <button class="sync-btn" onclick="setupGitHubSync()">⚙️</button>
             </div>
         </div>
     </div>
@@ -416,9 +419,9 @@
                     <h3>🎉 Splurge</h3>
                     <div class="bucket-amount">$<span id="splurge-amount">0.00</span></div>
                     <div class="bucket-meta">
-                        <span><span id="splurge-percent">10</span>%</span>
+                        <span><span id="splurge-percent">17</span>%</span>
                     </div>
-                    <input type="range" min="0" max="50" value="10" id="splurge-slider">
+                    <input type="range" min="0" max="50" value="17" id="splurge-slider">
                 </div>
 
                 <div class="bucket smile">
@@ -491,7 +494,7 @@
 
         let expenses = [];
         let netIncome = 2489.45;
-        let percentages = { daily: 60, splurge: 10, smile: 10, fire: 20 };
+        let percentages = { daily: 60, splurge: 17, smile: 10, fire: 20 };
         let editingIndex = -1;
         let customPreset = null;
 
@@ -502,17 +505,21 @@
             recovery: { daily: 55, splurge: 5, smile: 20, fire: 20 }
         };
 
-        // --- GITHUB SYNC FUNCTIONS ---
+        // --- GITHUB SYNC FUNCTIONS (MANUAL) ---
         async function setupGitHubSync() {
             const token = prompt("Enter GitHub Personal Access Token (with 'gist' scope):", GH_TOKEN);
-            if (!token) return;
+            if (token === null) return;
+            const gistId = prompt("Enter Gist ID (leave blank to create a new one):", GIST_ID);
+            
             GH_TOKEN = token;
+            GIST_ID = gistId;
             localStorage.setItem('gh_token', token);
-            await syncToGitHub();
+            localStorage.setItem('gist_id', gistId);
+            alert("Settings saved. You can now use Push/Pull.");
         }
 
         async function syncToGitHub() {
-            if (!GH_TOKEN) return;
+            if (!GH_TOKEN) return alert("Please set up GitHub Token first (⚙️)");
             updateSyncStatus('syncing');
 
             const payload = {
@@ -536,15 +543,21 @@
                     GIST_ID = data.id;
                     localStorage.setItem('gist_id', GIST_ID);
                     updateSyncStatus('connected');
+                    alert("Data successfully pushed to GitHub!");
+                } else {
+                    throw new Error("Invalid response");
                 }
             } catch (error) {
-                console.error("Sync Error:", error);
+                console.error("Push Error:", error);
                 updateSyncStatus('error');
+                alert("Push failed. Check token/id.");
             }
         }
 
         async function loadFromGitHub() {
-            if (!GH_TOKEN || !GIST_ID) return;
+            if (!GH_TOKEN || !GIST_ID) return alert("Setup Token and Gist ID first (⚙️)");
+            if (!confirm("Pull from GitHub? This will overwrite your current local data.")) return;
+            
             updateSyncStatus('syncing');
             try {
                 const response = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
@@ -560,26 +573,18 @@
 
                 refreshUI();
                 updateSyncStatus('connected');
+                alert("Data pulled successfully!");
             } catch (e) {
                 updateSyncStatus('error');
+                alert("Pull failed. Check Gist ID.");
             }
         }
 
         function updateSyncStatus(status) {
-            const pill = document.getElementById('sync-status');
             const text = document.getElementById('sync-text');
-            const btn = document.getElementById('sync-btn');
-            
-            if (status === 'connected') {
-                pill.style.background = 'rgba(255, 255, 255, 0.25)';
-                text.textContent = '✓ Synced';
-                btn.textContent = 'Update';
-            } else if (status === 'syncing') {
-                text.textContent = '⌛ Syncing...';
-            } else if (status === 'error') {
-                text.textContent = '⚠️ Error';
-                btn.textContent = 'Retry';
-            }
+            if (status === 'connected') text.textContent = '✓ Ready';
+            else if (status === 'syncing') text.textContent = '⌛ Busy...';
+            else if (status === 'error') text.textContent = '⚠️ Error';
         }
 
         // --- APP LOGIC ---
@@ -604,24 +609,15 @@
             document.getElementById('splurge-amount').textContent = (netIncome * percentages.splurge / 100).toFixed(2);
             document.getElementById('smile-amount').textContent = (netIncome * percentages.smile / 100).toFixed(2);
             document.getElementById('fire-amount').textContent = (netIncome * percentages.fire / 100).toFixed(2);
-            // document.getElementById('income-display').textContent = netIncome.toFixed(2); // Removed display
         }
 
         function renderExpenses() {
             const list = document.getElementById('expenses-list');
-            
             list.innerHTML = expenses.map((exp, index) => {
-                // Calculate estimated fortnightly cost for display
                 let fnCost = 0;
                 let showConverted = false;
-
-                if (exp.frequency === 'weekly') {
-                    fnCost = exp.amount * 2;
-                    showConverted = true;
-                } else if (exp.frequency === 'monthly') {
-                    fnCost = exp.amount / 2;
-                    showConverted = true;
-                }
+                if (exp.frequency === 'weekly') { fnCost = exp.amount * 2; showConverted = true; }
+                else if (exp.frequency === 'monthly') { fnCost = exp.amount / 2; showConverted = true; }
 
                 return `
                 <div class="expense-item">
@@ -639,10 +635,8 @@
                             <button class="btn-icon delete" onclick="deleteExpense(${index})">✕</button>
                         </div>
                     </div>
-                </div>
-                `;
+                </div>`;
             }).join('');
-            
             calculateBuckets();
         }
 
@@ -650,9 +644,7 @@
             const name = document.getElementById('expense-name').value;
             const amount = parseFloat(document.getElementById('expense-amount').value);
             const frequency = document.getElementById('expense-frequency').value;
-
             if (!name || isNaN(amount)) return alert('Please check inputs');
-
             if (editingIndex >= 0) {
                 expenses[editingIndex] = { name, amount, frequency };
                 editingIndex = -1;
@@ -660,9 +652,8 @@
             } else {
                 expenses.push({ name, amount, frequency });
             }
-            
             clearForm();
-            saveAndSync();
+            saveLocal();
         }
 
         function clearForm() {
@@ -677,26 +668,24 @@
             document.getElementById('expense-frequency').value = exp.frequency;
             editingIndex = index;
             document.getElementById('add-update-btn').textContent = 'Update';
-            document.querySelector('.expense-form').scrollIntoView({ behavior: 'smooth' });
         }
 
         function deleteExpense(index) {
             if (confirm('Delete this expense?')) {
                 expenses.splice(index, 1);
-                saveAndSync();
+                saveLocal();
             }
         }
 
-        function saveAndSync() {
+        function saveLocal() {
             localStorage.setItem('budgetData', JSON.stringify({ expenses, netIncome, percentages, customPreset }));
             renderExpenses();
-            if (GH_TOKEN && GIST_ID) syncToGitHub();
         }
 
         function applyPreset(name) {
             if (name === 'custom') {
                 customPreset = { ...percentages };
-                saveAndSync();
+                saveLocal();
                 alert('Custom settings saved!');
                 return;
             }
@@ -704,7 +693,7 @@
             if (p) {
                 percentages = { ...p };
                 updateAllSliders();
-                saveAndSync();
+                saveLocal();
             }
         }
 
@@ -734,7 +723,7 @@
         function resetExpenses() {
             if (confirm('Reset to default data?')) {
                 expenses = [...initialExpenses];
-                saveAndSync();
+                saveLocal();
             }
         }
 
@@ -742,15 +731,13 @@
             const blob = new Blob([JSON.stringify({expenses, netIncome, percentages}, null, 2)], {type: 'application/json'});
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url;
-            a.download = 'budget-backup.json';
-            a.click();
+            a.href = url; a.download = 'budget-backup.json'; a.click();
         }
 
         // LISTENERS
         document.getElementById('income').addEventListener('input', (e) => {
             netIncome = parseFloat(e.target.value) || 0;
-            saveAndSync();
+            saveLocal();
             calculateBuckets();
         });
 
@@ -759,7 +746,7 @@
                 percentages[key] = parseInt(e.target.value);
                 document.getElementById(`${key}-percent`).textContent = percentages[key];
                 checkPercentageTotal();
-                saveAndSync();
+                saveLocal();
                 calculateBuckets();
             });
         });
@@ -771,13 +758,12 @@
                 const data = JSON.parse(saved);
                 expenses = data.expenses || initialExpenses;
                 netIncome = data.netIncome || 2489.45;
-                percentages = data.percentages || percentages;
+                percentages = data.percentages || { daily: 60, splurge: 17, smile: 10, fire: 20 };
                 customPreset = data.customPreset;
             } else {
                 expenses = [...initialExpenses];
             }
             refreshUI();
-            if (GH_TOKEN && GIST_ID) loadFromGitHub();
         };
     </script>
 </body>
