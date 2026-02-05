@@ -752,6 +752,7 @@
         });
 
         // INIT
+       // INIT
         window.onload = () => {
             const saved = localStorage.getItem('budgetData');
             if (saved) {
@@ -763,8 +764,17 @@
             } else {
                 expenses = [...initialExpenses];
             }
+            
             refreshUI();
+
+            // --- AUTO PULL ON STARTUP ---
+            // If we have credentials, pull the latest from GitHub immediately
+            if (GH_TOKEN && GIST_ID) {
+                console.log("Found GitHub credentials, pulling data...");
+                loadFromGitHub();
+            }
         };
     </script>
 </body>
 </html>
+
