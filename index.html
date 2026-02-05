@@ -398,9 +398,9 @@
                     <h3>📊 Daily Expenses (Total)</h3>
                     <div class="bucket-amount">$<span id="daily-total-amount">0.00</span></div>
                     <div class="bucket-meta">
-                        <span>Allocated: <span id="daily-percent">60</span>%</span>
+                        <span>Allocated: <span id="daily-percent">0</span>%</span>
                     </div>
-                    <input type="range" min="0" max="100" value="60" id="daily-slider">
+                    <input type="range" min="0" max="100" value="0" id="daily-slider">
                 </div>
 
                 <div class="bucket bills">
@@ -419,27 +419,27 @@
                     <h3>🎉 Splurge</h3>
                     <div class="bucket-amount">$<span id="splurge-amount">0.00</span></div>
                     <div class="bucket-meta">
-                        <span><span id="splurge-percent">17</span>%</span>
+                        <span><span id="splurge-percent">0</span>%</span>
                     </div>
-                    <input type="range" min="0" max="50" value="17" id="splurge-slider">
+                    <input type="range" min="0" max="50" value="0" id="splurge-slider">
                 </div>
 
                 <div class="bucket smile">
                     <h3>😊 Smile</h3>
                     <div class="bucket-amount">$<span id="smile-amount">0.00</span></div>
                     <div class="bucket-meta">
-                        <span><span id="smile-percent">10</span>%</span>
+                        <span><span id="smile-percent">0</span>%</span>
                     </div>
-                    <input type="range" min="0" max="50" value="10" id="smile-slider">
+                    <input type="range" min="0" max="50" value="0" id="smile-slider">
                 </div>
 
                 <div class="bucket fire">
                     <h3>🔥 Fire Extinguisher</h3>
                     <div class="bucket-amount">$<span id="fire-amount">0.00</span></div>
                     <div class="bucket-meta">
-                        <span><span id="fire-percent">20</span>%</span>
+                        <span><span id="fire-percent">0</span>%</span>
                     </div>
-                    <input type="range" min="0" max="50" value="20" id="fire-slider">
+                    <input type="range" min="0" max="50" value="0" id="fire-slider">
                 </div>
             </div>
 
@@ -494,7 +494,7 @@
 
         let expenses = [];
         let netIncome = 2489.45;
-        let percentages = { daily: 60, splurge: 17, smile: 10, fire: 20 };
+        let percentages = { daily: 0, splurge: 0, smile: 0, fire: 0 };
         let editingIndex = -1;
         let customPreset = null;
 
@@ -758,8 +758,8 @@
             if (saved) {
                 const data = JSON.parse(saved);
                 expenses = data.expenses || initialExpenses;
-                netIncome = data.netIncome || 2489.45;
-                percentages = data.percentages || { daily: 60, splurge: 17, smile: 10, fire: 20 };
+                netIncome = data.netIncome || 0;
+                percentages = data.percentages || { daily: 0, splurge: 0, smile: 0, fire: 0 };
                 customPreset = data.customPreset;
             } else {
                 expenses = [...initialExpenses];
@@ -777,3 +777,4 @@
     </script>
 </body>
 </html>
+
