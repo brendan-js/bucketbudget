@@ -474,8 +474,9 @@
 
     <script>
         // --- GITHUB CONFIG ---
-        let GH_TOKEN = localStorage.getItem('gh_token') || '';
-        let GIST_ID = localStorage.getItem('gist_id') || '';
+        // --- GITHUB CONFIG ---
+        const GH_TOKEN = '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'; 
+        const GIST_ID = '1769c7895990ad45b10906724ec79c8a';
         const GIST_FILENAME = 'barefoot-budget-data.json';
 
         // --- DATA ---
@@ -493,8 +494,8 @@
         ];
 
         let expenses = [];
-        let netIncome = 2489.45;
-        let percentages = { daily: 60, splurge: 17, smile: 10, fire: 20 };
+        let netIncome = 0;
+        let percentages = { daily: 0, splurge: 0, smile: 0, fire: 0 };
         let editingIndex = -1;
         let customPreset = null;
 
@@ -754,27 +755,27 @@
         // INIT
        // INIT
         window.onload = () => {
+            // 1. Load local data first so the screen isn't blank
             const saved = localStorage.getItem('budgetData');
             if (saved) {
                 const data = JSON.parse(saved);
                 expenses = data.expenses || initialExpenses;
-                netIncome = data.netIncome || 2489.45;
-                percentages = data.percentages || { daily: 60, splurge: 17, smile: 10, fire: 20 };
-                customPreset = data.customPreset;
+                netIncome = data.netIncome || 0;
+                percentages = data.percentages || { daily: 0, splurge: 0, smile: 0, fire: 0 };
             } else {
                 expenses = [...initialExpenses];
             }
             
             refreshUI();
-
-            // --- AUTO PULL ON STARTUP ---
-            // If we have credentials, pull the latest from GitHub immediately
-            if (GH_TOKEN && GIST_ID) {
-                console.log("Found GitHub credentials, pulling data...");
+        
+            // 2. AUTO-PULL: If hardcoded info exists, pull from GitHub immediately
+            if (GH_TOKEN && GIST_ID && !GH_TOKEN.includes('your_')) {
+                console.log("Syncing with GitHub...");
                 loadFromGitHub();
             }
         };
     </script>
 </body>
 </html>
+
 
