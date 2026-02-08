@@ -2030,15 +2030,25 @@
             };
             
             console.log('Data being saved to GitHub:', dataToSync);
+            console.log('Saving to file:', `budget-${currentUser}.json`);
+
+            // Prepare payload - include current user's file
+            const filesPayload = {
+                [`budget-${currentUser}.json`]: { 
+                    content: JSON.stringify(dataToSync, null, 2) 
+                }
+            };
+            
+            // If updating existing gist, delete the old generic file if it exists
+            if (user.gistId) {
+                filesPayload['barefoot-budget-data.json'] = null; // This deletes the file
+                console.log('Will also delete old barefoot-budget-data.json file');
+            }
 
             const payload = {
                 description: `Budget data for ${currentUser}`,
                 public: false,
-                files: { 
-                    [`budget-${currentUser}.json`]: { 
-                        content: JSON.stringify(dataToSync, null, 2) 
-                    } 
-                }
+                files: filesPayload
             };
 
             try {
@@ -2111,13 +2121,25 @@
         }
 
         async function loadFromGitHub() {
-            if (!currentUser) return alert("Please select a user first");
+            if (!currentUser) {
+                alert("Please select a user first");
+                return;
+            }
             const user = users[currentUser];
-            if (!user.ghToken || !user.gistId) return alert("Setup Token and Gist ID first (⚙️)");
+            if (!user.ghToken || !user.gistId) {
+                alert("Setup Token and Gist ID first (⚙️)");
+                return;
+            }
             
             updateSyncStatus('syncing');
             try {
-                console.log('Loading from GitHub...', { gistId: user.gistId });
+                console.log('=== LOAD FROM GITHUB START ===');
+                console.log('Loading from GitHub...', { gistId: user.gistId, currentUser });
+                console.log('Current state BEFORE load:', { 
+                    expenses: JSON.parse(JSON.stringify(expenses)), 
+                    netIncome, 
+                    percentages: JSON.parse(JSON.stringify(percentages))
+                });
                 
                 const response = await fetch(`https://api.github.com/gists/${user.gistId}`, {
                     headers: { 
@@ -2130,14 +2152,40 @@
 
                 if (!response.ok) {
                     const errorText = await response.text();
+                    console.error('GitHub API Error:', errorText);
                     throw new Error(`GitHub API returned ${response.status}: ${errorText}`);
                 }
 
                 const gist = await response.json();
-                const filename = Object.keys(gist.files)[0]; // Get first file
-                const content = JSON.parse(gist.files[filename].content);
+                console.log('Gist response:', gist);
+                console.log('Available files:', Object.keys(gist.files));
                 
-                console.log('Data loaded from GitHub:', content);
+                // Look for file matching current user
+                const userFilename = `budget-${currentUser}.json`;
+                let filename = userFilename;
+                
+                if (!gist.files[userFilename]) {
+                    console.warn(`File ${userFilename} not found, trying first file...`);
+                    filename = Object.keys(gist.files)[0];
+                    console.log(`Using file: ${filename} instead`);
+                }
+                
+                console.log('Loading from file:', filename);
+                
+                if (!gist.files[filename]) {
+                    throw new Error(`No files found in gist`);
+                }
+                
+                const fileContent = gist.files[filename].content;
+                console.log('Raw file content:', fileContent);
+                
+                const content = JSON.parse(fileContent);
+                console.log('Parsed content from Gist:', content);
+                
+                // Store old values for comparison
+                const oldExpenses = JSON.parse(JSON.stringify(expenses));
+                const oldIncome = netIncome;
+                const oldPercentages = JSON.parse(JSON.stringify(percentages));
                 
                 expenses = content.expenses || initialExpenses;
                 netIncome = content.netIncome || 0;
@@ -2151,16 +2199,39 @@
                     paydayStart = content.settings.paydayStart ? new Date(content.settings.paydayStart) : new Date();
                 }
                 
-                console.log('State after load:', { expenses, netIncome, percentages, payFrequency, paydayWeekday, paydayStart });
+                console.log('State AFTER assignment:', { 
+                    expenses: JSON.parse(JSON.stringify(expenses)), 
+                    netIncome, 
+                    percentages: JSON.parse(JSON.stringify(percentages)),
+                    payFrequency,
+                    paydayWeekday,
+                    paydayStart
+                });
+                
+                console.log('Changes detected:', {
+                    expensesChanged: JSON.stringify(oldExpenses) !== JSON.stringify(expenses),
+                    incomeChanged: oldIncome !== netIncome,
+                    percentagesChanged: JSON.stringify(oldPercentages) !== JSON.stringify(percentages)
+                });
 
+                console.log('Calling saveUserData()...');
                 saveUserData();
+                
+                console.log('Calling refreshUI()...');
                 refreshUI();
+                
+                console.log('Calling updatePayFrequencyUI()...');
                 updatePayFrequencyUI();
+                
+                console.log('Calling renderCalendar()...');
                 renderCalendar();
+                
                 updateSyncStatus('connected');
+                console.log('=== LOAD FROM GITHUB COMPLETE ===');
                 alert('✅ Data loaded successfully!');
             } catch (e) {
                 console.error('Load error:', e);
+                console.error('Error stack:', e.stack);
                 updateSyncStatus('error');
                 
                 let errorMessage = "Load failed. ";
