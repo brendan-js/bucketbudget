@@ -317,6 +317,135 @@
         }
         .sync-btn:hover { background: rgba(255,255,255,0.3); }
 
+        .refresh-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: background 0.2s;
+        }
+
+        .refresh-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* Compact User Controls */
+        .user-controls-compact {
+            max-width: 600px;
+            margin: 15px auto 0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .current-user-display {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .btn-menu {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background 0.2s;
+        }
+
+        .btn-menu:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* User & Preset Menu Modal */
+        .menu-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: flex-start;
+            justify-content: center;
+            padding-top: 60px;
+        }
+
+        .menu-modal-content {
+            background: white;
+            padding: 25px;
+            border-radius: 16px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        .menu-section {
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .menu-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .menu-section h3 {
+            color: var(--text-main);
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+
+        .user-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .user-option {
+            padding: 12px;
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .user-option:hover {
+            background: #e2e8f0;
+        }
+
+        .user-option.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .presets-compact {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
         /* Compact Income Bar (Floating) */
         .income-bar-container {
             max-width: 600px;
@@ -1053,13 +1182,11 @@
     <div class="header">
         <h1>The Bucket Budget App</h1>
         
-        <!-- User Selector -->
-        <div class="user-section">
-            <select class="user-select" id="user-select" onchange="switchUser()">
-                <option value="">Select User...</option>
-            </select>
-            <button class="btn-user" onclick="addNewUser()">➕ Add User</button>
-            <button class="btn-user" onclick="deleteCurrentUser()">🗑️ Delete</button>
+        <!-- Compact User Controls -->
+        <div class="user-controls-compact">
+            <span class="current-user-display" id="current-user-display">No User</span>
+            <button class="btn-menu" onclick="openMenuModal()">Menu</button>
+            <button class="refresh-btn" onclick="location.reload()" title="Refresh">↻</button>
         </div>
 
         <!-- Sync Controls -->
@@ -1069,6 +1196,53 @@
                 <button class="sync-btn" onclick="syncToGitHub()">Save</button>
                 <button class="sync-btn" onclick="loadFromGitHub()">Load</button>
                 <button class="sync-btn" onclick="toggleSetup()">⚙️</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Menu Modal -->
+    <div class="menu-modal" id="menu-modal">
+        <div class="menu-modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0; color: var(--text-main);">Menu</h2>
+                <button class="day-modal-close" onclick="closeMenuModal()">✕</button>
+            </div>
+
+            <!-- Users Section -->
+            <div class="menu-section">
+                <h3>👤 Switch User</h3>
+                <div class="user-list" id="menu-user-list"></div>
+                <div style="display: flex; gap: 10px; margin-top: 12px;">
+                    <button class="btn-save" style="flex: 1;" onclick="addNewUser()">➕ Add User</button>
+                    <button class="btn-cancel" style="flex: 1;" onclick="deleteCurrentUser()">🗑️ Delete User</button>
+                </div>
+            </div>
+
+            <!-- Presets Section -->
+            <div class="menu-section">
+                <h3>🪣 Bucket Presets</h3>
+                <div class="presets-compact">
+                    <button class="preset-btn" onclick="applyPreset('standard'); closeMenuModal();">
+                        <strong>📘 Standard</strong>
+                        <small>60/10/10/20</small>
+                    </button>
+                    <button class="preset-btn" onclick="applyPreset('aggressive'); closeMenuModal();">
+                        <strong>💪 Aggressive</strong>
+                        <small>50/5/10/35</small>
+                    </button>
+                    <button class="preset-btn" onclick="applyPreset('balanced'); closeMenuModal();">
+                        <strong>⚖️ Balanced</strong>
+                        <small>55/15/10/20</small>
+                    </button>
+                    <button class="preset-btn" onclick="applyPreset('recovery'); closeMenuModal();">
+                        <strong>🚨 Recovery</strong>
+                        <small>55/5/20/20</small>
+                    </button>
+                    <button class="preset-btn" onclick="applyPreset('custom'); closeMenuModal();" style="grid-column: 1 / -1; border-style: dashed;">
+                        <strong>🎯 Save Custom</strong>
+                        <small>Current Settings</small>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -1198,29 +1372,6 @@
 
             <!-- Buckets Tab -->
             <div class="tab-content active" id="buckets-tab">
-                <div class="presets-grid">
-                <button class="preset-btn" onclick="applyPreset('standard')">
-                    <strong>📘 Standard Barefoot</strong>
-                    <small>60 / 10 / 10 / 20</small>
-                </button>
-                <button class="preset-btn" onclick="applyPreset('aggressive')">
-                    <strong>💪 Aggressive Saving</strong>
-                    <small>50 / 5 / 10 / 35</small>
-                </button>
-                <button class="preset-btn" onclick="applyPreset('balanced')">
-                    <strong>⚖️ Balanced Life</strong>
-                    <small>55 / 15 / 10 / 20</small>
-                </button>
-                <button class="preset-btn" onclick="applyPreset('recovery')">
-                    <strong>🚨 Recovery Mode</strong>
-                    <small>55 / 5 / 20 / 20</small>
-                </button>
-                <button class="preset-btn" onclick="applyPreset('custom')" style="border-style: dashed;">
-                    <strong>🎯 Save Custom</strong>
-                    <small>Current Settings</small>
-                </button>
-            </div>
-
             <div class="buckets-container">
                 <!-- Daily Expenses Group -->
                 <div class="daily-group">
@@ -1394,14 +1545,57 @@
         // --- USER MANAGEMENT ---
         function loadUserList() {
             const select = document.getElementById('user-select');
-            select.innerHTML = '<option value="">Select User...</option>';
-            Object.keys(users).forEach(username => {
-                const opt = document.createElement('option');
-                opt.value = username;
-                opt.textContent = username;
-                if (username === currentUser) opt.selected = true;
-                select.appendChild(opt);
-            });
+            if (select) {
+                select.innerHTML = '<option value="">Select User...</option>';
+                Object.keys(users).forEach(username => {
+                    const opt = document.createElement('option');
+                    opt.value = username;
+                    opt.textContent = username;
+                    if (username === currentUser) opt.selected = true;
+                    select.appendChild(opt);
+                });
+            }
+            
+            // Update menu user list
+            const menuList = document.getElementById('menu-user-list');
+            if (menuList) {
+                menuList.innerHTML = Object.keys(users).map(username => `
+                    <div class="user-option ${username === currentUser ? 'active' : ''}" onclick="switchToUser('${username}')">
+                        <span>${username}</span>
+                        ${username === currentUser ? '<span>✓</span>' : ''}
+                    </div>
+                `).join('');
+            }
+            
+            // Update current user display
+            const display = document.getElementById('current-user-display');
+            if (display) {
+                display.textContent = currentUser || 'No User';
+            }
+        }
+
+        function openMenuModal() {
+            loadUserList(); // Refresh the list
+            document.getElementById('menu-modal').style.display = 'flex';
+        }
+
+        function closeMenuModal() {
+            document.getElementById('menu-modal').style.display = 'none';
+        }
+
+        function switchToUser(username) {
+            currentUser = username;
+            localStorage.setItem('currentUser', currentUser);
+            loadUserData();
+            loadUserList();
+            
+            // Auto-pull on switch if configured
+            const user = users[currentUser];
+            if (user && user.ghToken && user.gistId) {
+                loadFromGitHub();
+            }
+            
+            closeMenuModal();
         }
 
         function addNewUser() {
@@ -1818,24 +2012,31 @@
             const user = users[currentUser];
             if (!user.ghToken) return alert("Please set up GitHub Token first (⚙️)");
             
+            // Save current state to localStorage first
+            saveUserData();
+            
             updateSyncStatus('syncing');
+
+            const dataToSync = {
+                expenses, 
+                netIncome, 
+                percentages, 
+                customPreset,
+                settings: {
+                    payFrequency,
+                    paydayWeekday,
+                    paydayStart: paydayStart.toISOString().split('T')[0]
+                }
+            };
+            
+            console.log('Data being saved to GitHub:', dataToSync);
 
             const payload = {
                 description: `Budget data for ${currentUser}`,
                 public: false,
                 files: { 
                     [`budget-${currentUser}.json`]: { 
-                        content: JSON.stringify({ 
-                            expenses, 
-                            netIncome, 
-                            percentages, 
-                            customPreset,
-                            settings: {
-                                payFrequency,
-                                paydayWeekday,
-                                paydayStart: paydayStart.toISOString().split('T')[0]
-                            }
-                        }, null, 2) 
+                        content: JSON.stringify(dataToSync, null, 2) 
                     } 
                 }
             };
@@ -1936,7 +2137,7 @@
                 const filename = Object.keys(gist.files)[0]; // Get first file
                 const content = JSON.parse(gist.files[filename].content);
                 
-                console.log('Load successful, loading data...');
+                console.log('Data loaded from GitHub:', content);
                 
                 expenses = content.expenses || initialExpenses;
                 netIncome = content.netIncome || 0;
@@ -1949,6 +2150,8 @@
                     paydayWeekday = content.settings.paydayWeekday !== undefined ? content.settings.paydayWeekday : 4;
                     paydayStart = content.settings.paydayStart ? new Date(content.settings.paydayStart) : new Date();
                 }
+                
+                console.log('State after load:', { expenses, netIncome, percentages, payFrequency, paydayWeekday, paydayStart });
 
                 saveUserData();
                 refreshUI();
@@ -2236,6 +2439,13 @@
             document.getElementById('day-modal').addEventListener('click', (e) => {
                 if (e.target.id === 'day-modal') {
                     closeDayModal();
+                }
+            });
+
+            // Close menu modal when clicking outside
+            document.getElementById('menu-modal').addEventListener('click', (e) => {
+                if (e.target.id === 'menu-modal') {
+                    closeMenuModal();
                 }
             });
             
