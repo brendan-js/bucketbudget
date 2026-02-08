@@ -2032,23 +2032,14 @@
             console.log('Data being saved to GitHub:', dataToSync);
             console.log('Saving to file:', `budget-${currentUser}.json`);
 
-            // Prepare payload - include current user's file
-            const filesPayload = {
-                [`budget-${currentUser}.json`]: { 
-                    content: JSON.stringify(dataToSync, null, 2) 
-                }
-            };
-            
-            // If updating existing gist, delete the old generic file if it exists
-            if (user.gistId) {
-                filesPayload['barefoot-budget-data.json'] = null; // This deletes the file
-                console.log('Will also delete old barefoot-budget-data.json file');
-            }
-
             const payload = {
                 description: `Budget data for ${currentUser}`,
                 public: false,
-                files: filesPayload
+                files: { 
+                    [`budget-${currentUser}.json`]: { 
+                        content: JSON.stringify(dataToSync, null, 2) 
+                    }
+                }
             };
 
             try {
