@@ -943,6 +943,41 @@
             opacity: 0.9;
         }
 
+        .cycle-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .cycle-nav-btn {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+
+        .cycle-nav-btn:hover {
+            background: rgba(255, 255, 255, 0.28);
+        }
+
+        .cycle-nav-today {
+            flex: 0 0 auto;
+            padding: 6px 10px;
+            font-size: 1rem;
+            line-height: 1;
+            opacity: 0.9;
+        }
+
         .daily-breakdown {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -1448,6 +1483,12 @@
                         </div>
                     </div>
 
+                    <div class="cycle-nav">
+                        <button class="cycle-nav-btn" onclick="changeCycle(-1)">← Prev</button>
+                        <button class="cycle-nav-btn cycle-nav-today" id="cycle-today-btn" onclick="resetToCurrentCycle()" title="Back to current cycle" style="display:none;">📍</button>
+                        <button class="cycle-nav-btn" onclick="changeCycle(1)">Next →</button>
+                    </div>
+
                     <div class="daily-breakdown">
                         <div class="daily-sub-bucket">
                             <div class="daily-sub-title">🏦 Bills Account</div>
@@ -1633,6 +1674,9 @@
         let calendarMonth = new Date().getMonth();
         let calendarYear = new Date().getFullYear();
 
+        // --- CYCLE NAVIGATION STATE ---
+        let cycleOffset = 0; // 0 = current cycle, 1 = next, -1 = previous, etc.
+
         const initialExpenses = [
             { name: 'Example: Rent', amount: 400, frequency: 'weekly', dueDay: null, dueWeekday: null },
         ];
@@ -1785,6 +1829,8 @@
         }
 
         function loadUserData() {
+            cycleOffset = 0;
+
             if (!currentUser || !users[currentUser]) {
                 expenses = [...initialExpenses];
                 netIncome = 0;
@@ -1951,7 +1997,7 @@
         // Bills are matched against the cycle they actually fall in, instead of being
         // averaged out evenly across every fortnight.
 
-        function getCurrentPayCycle() {
+        function getCurrentPayCycle(offset = 0) {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             const start = new Date(paydayStart);
@@ -1962,6 +2008,7 @@
                 if (cycleStart > today) {
                     cycleStart = new Date(today.getFullYear(), today.getMonth() - 1, start.getDate());
                 }
+                cycleStart = new Date(cycleStart.getFullYear(), cycleStart.getMonth() + offset, start.getDate());
                 let cycleEnd = new Date(cycleStart.getFullYear(), cycleStart.getMonth() + 1, cycleStart.getDate());
                 cycleEnd.setDate(cycleEnd.getDate() - 1);
                 return { cycleStart, cycleEnd };
@@ -1969,7 +2016,7 @@
 
             const cycleDays = payFrequency === 'weekly' ? 7 : 14;
             const diffDays = Math.floor((today - start) / (1000 * 60 * 60 * 24));
-            const cyclesPassed = Math.floor(diffDays / cycleDays);
+            const cyclesPassed = Math.floor(diffDays / cycleDays) + offset;
 
             const cycleStart = new Date(start);
             cycleStart.setDate(cycleStart.getDate() + cyclesPassed * cycleDays);
@@ -2403,7 +2450,7 @@
         }
         
         function calculateBuckets() {
-            const { cycleStart, cycleEnd } = getCurrentPayCycle();
+            const { cycleStart, cycleEnd } = getCurrentPayCycle(cycleOffset);
             const { total: totalBills } = getBillsDueInCycle(cycleStart, cycleEnd);
 
             const dailyTotal = netIncome * (percentages.daily / 100);
@@ -2417,7 +2464,13 @@
             document.getElementById('fire-amount').textContent = (netIncome * percentages.fire / 100).toFixed(2);
 
             const cycleLabel = document.getElementById('cycle-range-label');
-            if (cycleLabel) cycleLabel.textContent = formatCycleRange(cycleStart, cycleEnd);
+            if (cycleLabel) {
+                const prefix = cycleOffset === 0 ? 'This cycle' : (cycleOffset > 0 ? `${cycleOffset} cycle${cycleOffset > 1 ? 's' : ''} ahead` : `${Math.abs(cycleOffset)} cycle${cycleOffset < -1 ? 's' : ''} ago`);
+                cycleLabel.textContent = `${prefix}: ${formatCycleRange(cycleStart, cycleEnd)}`;
+            }
+
+            const todayBtn = document.getElementById('cycle-today-btn');
+            if (todayBtn) todayBtn.style.display = cycleOffset === 0 ? 'none' : '';
 
             const billsDesc = document.getElementById('bills-due-desc');
             if (billsDesc) {
@@ -2428,12 +2481,27 @@
 
             // Only show the bills-exceed warning if percentages are already valid (100%),
             // so it doesn't fight with checkPercentageTotal() for the same warning box.
+            // Skip it entirely when browsing a future/past cycle - it's only actionable for the current one.
             const percentTotal = Object.values(percentages).reduce((a, b) => a + b, 0);
-            if (percentTotal === 100 && dailyTotal > 0 && totalBills > dailyTotal) {
-                const warn = document.getElementById('percentage-warning');
-                warn.style.display = 'block';
-                warn.innerHTML = `⚠️ <strong>Heads up:</strong> Bills due this cycle ($${totalBills.toFixed(2)}) exceed your Daily Expenses allocation ($${dailyTotal.toFixed(2)}). Consider raising the Daily % this cycle.`;
+            const warn = document.getElementById('percentage-warning');
+            if (percentTotal === 100) {
+                if (cycleOffset === 0 && dailyTotal > 0 && totalBills > dailyTotal) {
+                    warn.style.display = 'block';
+                    warn.innerHTML = `⚠️ <strong>Heads up:</strong> Bills due this cycle ($${totalBills.toFixed(2)}) exceed your Daily Expenses allocation ($${dailyTotal.toFixed(2)}). Consider raising the Daily % this cycle.`;
+                } else {
+                    warn.style.display = 'none';
+                }
             }
+        }
+
+        function changeCycle(delta) {
+            cycleOffset += delta;
+            calculateBuckets();
+        }
+
+        function resetToCurrentCycle() {
+            cycleOffset = 0;
+            calculateBuckets();
         }
 
         function renderExpenses() {
