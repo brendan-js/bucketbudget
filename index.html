@@ -1095,7 +1095,7 @@
         /* Expenses Section */
         .expense-form {
             display: grid;
-            grid-template-columns: 2fr 1fr 1fr 80px auto;
+            grid-template-columns: 2fr 1fr 1fr 110px auto;
             gap: 10px;
             background: white;
             padding: 15px;
@@ -1103,6 +1103,23 @@
             margin-bottom: 20px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.03);
             border: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .due-field-wrapper {
+            display: flex;
+            align-items: center;
+        }
+
+        .due-field-wrapper .due-weekday-field,
+        .due-field-wrapper .due-day-field {
+            width: 100%;
+        }
+
+        .due-payday-hint {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            text-align: center;
+            width: 100%;
         }
 
         .form-input {
@@ -1384,33 +1401,6 @@
                 <span style="font-weight: 600; color: var(--text-main);">🌙 Dark Mode</span>
             </label>
 
-            <h4 style="margin: 20px 0 10px; color: var(--text-main); font-size: 1rem;">💰 Pay Frequency</h4>
-            <div class="pay-freq-row">
-                <button class="pay-freq-btn" id="freq-weekly" onclick="setPayFrequency('weekly')">Weekly</button>
-                <button class="pay-freq-btn" id="freq-fortnightly" onclick="setPayFrequency('fortnightly')">Fortnightly</button>
-                <button class="pay-freq-btn" id="freq-monthly" onclick="setPayFrequency('monthly')">Monthly</button>
-            </div>
-
-            <h4 style="margin: 20px 0 10px; color: var(--text-main); font-size: 1rem;">📅 Payday Settings</h4>
-            <div class="setup-row">
-                <span class="setup-label">Pay Day:</span>
-                <select class="setup-input" id="payday-weekday" style="font-family: inherit;">
-                    <option value="0">Sunday</option>
-                    <option value="1">Monday</option>
-                    <option value="2">Tuesday</option>
-                    <option value="3">Wednesday</option>
-                    <option value="4" selected>Thursday</option>
-                    <option value="5">Friday</option>
-                    <option value="6">Saturday</option>
-                </select>
-            </div>
-            
-            <div class="setup-row">
-                <span class="setup-label">Start Date:</span>
-                <input type="date" class="setup-input" id="payday-start" style="font-family: inherit;">
-            </div>
-            <div class="setup-help">Set your next/recent payday to calculate future pay dates</div>
-
             <h4 style="margin: 20px 0 10px; color: var(--text-main); font-size: 1rem;">🔗 GitHub Sync</h4>
             <div class="setup-row">
                 <span class="setup-label">GitHub Token:</span>
@@ -1447,7 +1437,7 @@
                     <div class="daily-header">
                         <div>
                             <div class="daily-title">📊 Daily Expenses</div>
-                            <div style="font-size: 0.85rem; opacity: 0.9; margin-top: 5px;">Split into Bills + Essentials</div>
+                            <div style="font-size: 0.85rem; opacity: 0.9; margin-top: 5px;" id="cycle-range-label">This cycle</div>
                         </div>
                         <div class="daily-total">
                             <div class="daily-total-amount">$<span id="daily-total-amount">0.00</span></div>
@@ -1462,7 +1452,7 @@
                         <div class="daily-sub-bucket">
                             <div class="daily-sub-title">🏦 Bills Account</div>
                             <div class="daily-sub-amount">$<span id="bills-amount">0.00</span></div>
-                            <div class="daily-sub-desc">Fixed bills & direct debits</div>
+                            <div class="daily-sub-desc" id="bills-due-desc">Covers bills due this cycle</div>
                         </div>
                         <div class="daily-sub-bucket">
                             <div class="daily-sub-title">🛒 Essentials Account</div>
@@ -1562,14 +1552,27 @@
             <div class="expense-form">
                 <input type="text" class="form-input" id="expense-name" placeholder="Description (e.g. Rent)">
                 <input type="number" class="form-input" id="expense-amount" placeholder="Amount" step="0.01">
-                <select class="form-input" id="expense-frequency">
+                <select class="form-input" id="expense-frequency" onchange="updateDueFieldVisibility('expense')">
                     <option value="fortnightly">Fortnightly</option>
                     <option value="weekly">Weekly</option>
                     <option value="monthly">Monthly</option>
                     <option value="oneoff">One-off</option>
                 </select>
-                <input type="number" class="form-input" id="expense-day" placeholder="Day" min="1" max="31" title="Day of month (1-31) or leave blank for payday">
-                <button class="btn-add" id="add-update-btn" onclick="addOrUpdateExpense()">Add</button>
+                <div class="due-field-wrapper" id="expense-due-wrapper">
+                    <select class="form-input due-weekday-field" id="expense-weekday" style="display:none;">
+                        <option value="">Payday</option>
+                        <option value="0">Sunday</option>
+                        <option value="1">Monday</option>
+                        <option value="2">Tuesday</option>
+                        <option value="3">Wednesday</option>
+                        <option value="4">Thursday</option>
+                        <option value="5">Friday</option>
+                        <option value="6">Saturday</option>
+                    </select>
+                    <input type="number" class="form-input due-day-field" id="expense-day" placeholder="Day of month" min="1" max="31" title="Day of month (1-31)" style="display:none;">
+                    <span class="due-payday-hint" id="expense-payday-hint" style="display:none;">Payday</span>
+                </div>
+                <button class="btn-add" id="add-expense-btn" onclick="addExpense()">Add</button>
             </div>
 
             <div class="expense-list" id="expenses-list"></div>
@@ -1580,6 +1583,38 @@
             </div>
         </div>
 
+    </div>
+
+    <!-- Edit Expense Modal -->
+    <div class="modal" id="edit-expense-modal">
+        <div class="modal-content">
+            <h3 id="edit-expense-title">✎ Edit Expense</h3>
+            <input type="text" class="modal-input" id="edit-expense-name" placeholder="Description (e.g. Rent)">
+            <input type="number" class="modal-input" id="edit-expense-amount" placeholder="Amount" step="0.01">
+            <select class="modal-input" id="edit-expense-frequency" onchange="updateDueFieldVisibility('edit-expense')">
+                <option value="fortnightly">Fortnightly</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="oneoff">One-off</option>
+            </select>
+            <select class="modal-input due-weekday-field" id="edit-expense-weekday" style="display:none;">
+                <option value="">Defaults to payday</option>
+                <option value="0">Sunday</option>
+                <option value="1">Monday</option>
+                <option value="2">Tuesday</option>
+                <option value="3">Wednesday</option>
+                <option value="4">Thursday</option>
+                <option value="5">Friday</option>
+                <option value="6">Saturday</option>
+            </select>
+            <input type="number" class="modal-input due-day-field" id="edit-expense-day" placeholder="Due day of month" min="1" max="31" style="display:none;">
+            <div class="setup-help due-payday-hint" id="edit-expense-payday-hint" style="display:none; margin-top: -12px; margin-bottom: 20px;">Fortnightly bills default to your payday</div>
+            <div class="modal-actions">
+                <button class="btn-primary" onclick="saveEditedExpense()">Save Changes</button>
+                <button class="btn-cancel" onclick="closeEditExpenseModal()">Cancel</button>
+            </div>
+            <button class="btn-secondary" style="width: 100%; margin-top: 10px; color: var(--danger); border-color: #fed7d7;" onclick="deleteExpenseFromModal()">🗑️ Delete Expense</button>
+        </div>
     </div>
 
     <script>
@@ -1599,7 +1634,7 @@
         let calendarYear = new Date().getFullYear();
 
         const initialExpenses = [
-            { name: 'Example: Rent', amount: 400, frequency: 'weekly', dueDay: null },
+            { name: 'Example: Rent', amount: 400, frequency: 'weekly', dueDay: null, dueWeekday: null },
         ];
 
         let expenses = [];
@@ -1829,27 +1864,10 @@
             document.getElementById('dark-mode-toggle').checked = darkMode;
         }
 
-        // --- PAY FREQUENCY FUNCTIONS ---
-        
-        function setPayFrequency(freq) {
-            payFrequency = freq;
-            updatePayFrequencyUI();
-            saveUserData();
-            calculateBuckets();
-            renderCalendar();
-        }
+        // --- INCOME LABEL ---
 
         function updatePayFrequencyUI() {
-            document.querySelectorAll('.pay-freq-btn').forEach(btn => btn.classList.remove('active'));
-            document.getElementById(`freq-${payFrequency}`).classList.add('active');
-            
-            // Update income label
-            const labels = {
-                weekly: 'My Weekly Pay',
-                fortnightly: 'My Fortnightly Pay',
-                monthly: 'My Monthly Pay'
-            };
-            document.querySelector('.income-label').textContent = labels[payFrequency] || labels.fortnightly;
+            document.querySelector('.income-label').textContent = 'My Fortnightly Pay';
         }
 
         // --- TAB SWITCHING ---
@@ -1928,35 +1946,91 @@
             return false;
         }
 
+        // --- PAY CYCLE LOGIC ---
+        // A "cycle" is the stretch of days between one payday and the day before the next.
+        // Bills are matched against the cycle they actually fall in, instead of being
+        // averaged out evenly across every fortnight.
+
+        function getCurrentPayCycle() {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const start = new Date(paydayStart);
+            start.setHours(0, 0, 0, 0);
+
+            if (payFrequency === 'monthly') {
+                let cycleStart = new Date(today.getFullYear(), today.getMonth(), start.getDate());
+                if (cycleStart > today) {
+                    cycleStart = new Date(today.getFullYear(), today.getMonth() - 1, start.getDate());
+                }
+                let cycleEnd = new Date(cycleStart.getFullYear(), cycleStart.getMonth() + 1, cycleStart.getDate());
+                cycleEnd.setDate(cycleEnd.getDate() - 1);
+                return { cycleStart, cycleEnd };
+            }
+
+            const cycleDays = payFrequency === 'weekly' ? 7 : 14;
+            const diffDays = Math.floor((today - start) / (1000 * 60 * 60 * 24));
+            const cyclesPassed = Math.floor(diffDays / cycleDays);
+
+            const cycleStart = new Date(start);
+            cycleStart.setDate(cycleStart.getDate() + cyclesPassed * cycleDays);
+            const cycleEnd = new Date(cycleStart);
+            cycleEnd.setDate(cycleEnd.getDate() + cycleDays - 1);
+
+            return { cycleStart, cycleEnd };
+        }
+
+        // Single source of truth for "is this expense due on this specific date"
+        // Used by both the calendar and the cycle bills calculation.
+        function isExpenseDueOnDate(exp, date) {
+            if (exp.frequency === 'oneoff') {
+                // One-offs only land on the calendar/cycle if a specific day was set
+                return !!exp.dueDay && date.getDate() === exp.dueDay;
+            }
+
+            if (exp.frequency === 'weekly') {
+                const weekday = (exp.dueWeekday !== null && exp.dueWeekday !== undefined) ? exp.dueWeekday : paydayWeekday;
+                return date.getDay() === weekday;
+            }
+
+            if (exp.frequency === 'monthly') {
+                const day = exp.dueDay || new Date(paydayStart).getDate();
+                return date.getDate() === day;
+            }
+
+            if (exp.frequency === 'fortnightly') {
+                // Fortnightly bills always land on payday
+                return isPayday(date);
+            }
+
+            return false;
+        }
+
         function getExpensesForDate(date) {
-            return expenses.filter(exp => {
-                if (exp.frequency === 'oneoff') return false;
-                
-                // If expense has a specific due day set, use that for monthly bills
-                if (exp.dueDay && exp.frequency === 'monthly') {
-                    return date.getDate() === exp.dueDay;
-                }
-                
-                // For bills without a due day, or weekly/fortnightly bills, use payday logic
-                if (!exp.dueDay || exp.dueDay === null || exp.dueDay === '') {
-                    if (exp.frequency === 'fortnightly') {
-                        return isPayday(date);
-                    } else if (exp.frequency === 'weekly') {
-                        // Weekly expenses on every instance of the payday weekday
-                        return date.getDay() === paydayWeekday;
-                    } else if (exp.frequency === 'monthly') {
-                        // Monthly on payday date of month if no dueDay specified
-                        return date.getDate() === new Date(paydayStart).getDate();
+            return expenses.filter(exp => isExpenseDueOnDate(exp, date));
+        }
+
+        // Walks every day in the given cycle and totals up whatever bills actually land in it
+        function getBillsDueInCycle(cycleStart, cycleEnd) {
+            let total = 0;
+            const dueItems = [];
+            const cursor = new Date(cycleStart);
+
+            while (cursor <= cycleEnd) {
+                expenses.forEach(exp => {
+                    if (exp.frequency !== 'oneoff' && isExpenseDueOnDate(exp, cursor)) {
+                        total += exp.amount;
+                        dueItems.push({ ...exp, dueDate: new Date(cursor) });
                     }
-                }
-                
-                // If weekly/fortnightly has a specific due day, show on that day of month
-                if (exp.dueDay && (exp.frequency === 'weekly' || exp.frequency === 'fortnightly')) {
-                    return date.getDate() === exp.dueDay;
-                }
-                
-                return false;
-            });
+                });
+                cursor.setDate(cursor.getDate() + 1);
+            }
+
+            return { total, dueItems };
+        }
+
+        function formatCycleRange(cycleStart, cycleEnd) {
+            const opts = { month: 'short', day: 'numeric' };
+            return `This cycle: ${cycleStart.toLocaleDateString('en-AU', opts)} – ${cycleEnd.toLocaleDateString('en-AU', opts)}`;
         }
 
         function renderCalendar() {
@@ -2046,10 +2120,6 @@
                 if (currentUser && users[currentUser]) {
                     document.getElementById('setup-token').value = users[currentUser].ghToken || '';
                     document.getElementById('setup-gist').value = users[currentUser].gistId || '';
-                    
-                    const settings = users[currentUser].settings || {};
-                    document.getElementById('payday-weekday').value = settings.paydayWeekday !== undefined ? settings.paydayWeekday : 4;
-                    document.getElementById('payday-start').value = settings.paydayStart || new Date().toISOString().split('T')[0];
                 }
                 
                 updateThemeUI();
@@ -2067,14 +2137,9 @@
             users[currentUser].ghToken = token;
             users[currentUser].gistId = gistId;
             
-            // Save payday settings
-            paydayWeekday = parseInt(document.getElementById('payday-weekday').value);
-            paydayStart = new Date(document.getElementById('payday-start').value);
-            
             saveUserData();
             localStorage.setItem('users', JSON.stringify(users));
             
-            renderCalendar();
             alert("Settings saved!");
             toggleSetup();
         }
@@ -2338,24 +2403,8 @@
         }
         
         function calculateBuckets() {
-            let totalBills = 0;
-            
-            // Convert all expenses to the current pay frequency
-            expenses.forEach(exp => {
-                let convertedAmount = exp.amount;
-                
-                // First convert to fortnightly as base
-                if (exp.frequency === 'weekly') convertedAmount = exp.amount * 2;
-                else if (exp.frequency === 'monthly') convertedAmount = exp.amount / 2;
-                else if (exp.frequency === 'oneoff') convertedAmount = 0;
-                else if (exp.frequency === 'fortnightly') convertedAmount = exp.amount;
-                
-                // Then convert from fortnightly to current pay frequency
-                if (payFrequency === 'weekly') convertedAmount = convertedAmount / 2;
-                else if (payFrequency === 'monthly') convertedAmount = convertedAmount * 2.167; // Average month
-                
-                if (exp.frequency !== 'oneoff') totalBills += convertedAmount;
-            });
+            const { cycleStart, cycleEnd } = getCurrentPayCycle();
+            const { total: totalBills } = getBillsDueInCycle(cycleStart, cycleEnd);
 
             const dailyTotal = netIncome * (percentages.daily / 100);
             const spending = Math.max(0, dailyTotal - totalBills);
@@ -2366,6 +2415,25 @@
             document.getElementById('splurge-amount').textContent = (netIncome * percentages.splurge / 100).toFixed(2);
             document.getElementById('smile-amount').textContent = (netIncome * percentages.smile / 100).toFixed(2);
             document.getElementById('fire-amount').textContent = (netIncome * percentages.fire / 100).toFixed(2);
+
+            const cycleLabel = document.getElementById('cycle-range-label');
+            if (cycleLabel) cycleLabel.textContent = formatCycleRange(cycleStart, cycleEnd);
+
+            const billsDesc = document.getElementById('bills-due-desc');
+            if (billsDesc) {
+                billsDesc.textContent = totalBills > 0
+                    ? `Covers everything due this cycle`
+                    : `Nothing due this cycle`;
+            }
+
+            // Only show the bills-exceed warning if percentages are already valid (100%),
+            // so it doesn't fight with checkPercentageTotal() for the same warning box.
+            const percentTotal = Object.values(percentages).reduce((a, b) => a + b, 0);
+            if (percentTotal === 100 && dailyTotal > 0 && totalBills > dailyTotal) {
+                const warn = document.getElementById('percentage-warning');
+                warn.style.display = 'block';
+                warn.innerHTML = `⚠️ <strong>Heads up:</strong> Bills due this cycle ($${totalBills.toFixed(2)}) exceed your Daily Expenses allocation ($${dailyTotal.toFixed(2)}). Consider raising the Daily % this cycle.`;
+            }
         }
 
         function renderExpenses() {
@@ -2391,7 +2459,22 @@
                     showConverted = payFrequency !== 'fortnightly';
                 }
 
-                const dueDayText = exp.dueDay ? ` • Due: ${exp.dueDay}${getDaySuffix(exp.dueDay)}` : ' • Due: Payday';
+                let dueDayText;
+                const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                if (exp.frequency === 'oneoff') {
+                    dueDayText = exp.dueDay ? ` • Due: ${exp.dueDay}${getDaySuffix(exp.dueDay)}` : ' • No date set';
+                } else if (exp.frequency === 'weekly') {
+                    if (exp.dueWeekday !== null && exp.dueWeekday !== undefined) {
+                        dueDayText = ` • Due: ${dayNames[exp.dueWeekday]}s`;
+                    } else {
+                        dueDayText = ' • Due: Payday';
+                    }
+                } else if (exp.frequency === 'monthly') {
+                    const day = exp.dueDay || new Date(paydayStart).getDate();
+                    dueDayText = exp.dueDay ? ` • Due: ${day}${getDaySuffix(day)}` : ` • Due: ${day}${getDaySuffix(day)} (payday date)`;
+                } else {
+                    dueDayText = ' • Due: Payday';
+                }
 
                 return `
                 <div class="expense-item">
@@ -2406,7 +2489,7 @@
                     <div class="expense-actions">
                         <span class="expense-cost">$${exp.amount.toFixed(2)}</span>
                         <div style="display:flex; gap:5px;">
-                            <button class="btn-icon" onclick="editExpense(${index})">✎</button>
+                            <button class="btn-icon" onclick="openEditExpenseModal(${index})">✎</button>
                             <button class="btn-icon delete" onclick="deleteExpense(${index})">✕</button>
                         </div>
                     </div>
@@ -2425,42 +2508,101 @@
             }
         }
 
-        function addOrUpdateExpense() {
+        function updateDueFieldVisibility(prefix) {
+            const frequency = document.getElementById(`${prefix}-frequency`).value;
+            const weekdayField = document.getElementById(`${prefix}-weekday`);
+            const dayField = document.getElementById(`${prefix}-day`);
+            const paydayHint = document.getElementById(`${prefix}-payday-hint`);
+
+            weekdayField.style.display = 'none';
+            dayField.style.display = 'none';
+            if (paydayHint) paydayHint.style.display = 'none';
+
+            if (frequency === 'weekly') {
+                weekdayField.style.display = '';
+            } else if (frequency === 'monthly' || frequency === 'oneoff') {
+                dayField.style.display = '';
+            } else if (frequency === 'fortnightly') {
+                if (paydayHint) paydayHint.style.display = '';
+            }
+        }
+
+        function addExpense() {
             const name = document.getElementById('expense-name').value;
             const amount = parseFloat(document.getElementById('expense-amount').value);
             const frequency = document.getElementById('expense-frequency').value;
-            const dueDay = document.getElementById('expense-day').value ? parseInt(document.getElementById('expense-day').value) : null;
-            
+            const weekdayVal = document.getElementById('expense-weekday').value;
+            const dayVal = document.getElementById('expense-day').value;
+
             if (!name || isNaN(amount)) return alert('Please check inputs');
-            
-            const expense = { name, amount, frequency, dueDay };
-            
-            if (editingIndex >= 0) {
-                expenses[editingIndex] = expense;
-                editingIndex = -1;
-                document.getElementById('add-update-btn').textContent = 'Add';
-            } else {
-                expenses.push(expense);
-            }
+
+            const dueWeekday = (frequency === 'weekly' && weekdayVal !== '') ? parseInt(weekdayVal) : null;
+            const dueDay = (frequency === 'monthly' || frequency === 'oneoff') && dayVal ? parseInt(dayVal) : null;
+
+            expenses.push({ name, amount, frequency, dueDay, dueWeekday });
             clearForm();
             saveUserData();
             renderExpenses();
+            renderCalendar();
         }
 
         function clearForm() {
             document.getElementById('expense-name').value = '';
             document.getElementById('expense-amount').value = '';
             document.getElementById('expense-day').value = '';
+            document.getElementById('expense-weekday').value = '';
+            updateDueFieldVisibility('expense');
         }
 
-        function editExpense(index) {
+        // --- EDIT EXPENSE MODAL ---
+        function openEditExpenseModal(index) {
             const exp = expenses[index];
-            document.getElementById('expense-name').value = exp.name;
-            document.getElementById('expense-amount').value = exp.amount;
-            document.getElementById('expense-frequency').value = exp.frequency;
-            document.getElementById('expense-day').value = exp.dueDay || '';
+            document.getElementById('edit-expense-title').textContent = `✎ Edit "${exp.name}"`;
+            document.getElementById('edit-expense-name').value = exp.name;
+            document.getElementById('edit-expense-amount').value = exp.amount;
+            document.getElementById('edit-expense-frequency').value = exp.frequency;
+            document.getElementById('edit-expense-weekday').value = (exp.dueWeekday !== null && exp.dueWeekday !== undefined) ? exp.dueWeekday : '';
+            document.getElementById('edit-expense-day').value = exp.dueDay || '';
+            updateDueFieldVisibility('edit-expense');
             editingIndex = index;
-            document.getElementById('add-update-btn').textContent = 'Update';
+            document.getElementById('edit-expense-modal').style.display = 'flex';
+        }
+
+        function closeEditExpenseModal() {
+            document.getElementById('edit-expense-modal').style.display = 'none';
+            editingIndex = -1;
+        }
+
+        function saveEditedExpense() {
+            if (editingIndex < 0) return closeEditExpenseModal();
+            
+            const name = document.getElementById('edit-expense-name').value;
+            const amount = parseFloat(document.getElementById('edit-expense-amount').value);
+            const frequency = document.getElementById('edit-expense-frequency').value;
+            const weekdayVal = document.getElementById('edit-expense-weekday').value;
+            const dayVal = document.getElementById('edit-expense-day').value;
+            
+            if (!name || isNaN(amount)) return alert('Please check inputs');
+            
+            const dueWeekday = (frequency === 'weekly' && weekdayVal !== '') ? parseInt(weekdayVal) : null;
+            const dueDay = (frequency === 'monthly' || frequency === 'oneoff') && dayVal ? parseInt(dayVal) : null;
+            
+            expenses[editingIndex] = { name, amount, frequency, dueDay, dueWeekday };
+            saveUserData();
+            renderExpenses();
+            renderCalendar();
+            closeEditExpenseModal();
+        }
+
+        function deleteExpenseFromModal() {
+            if (editingIndex < 0) return;
+            if (confirm('Delete this expense?')) {
+                expenses.splice(editingIndex, 1);
+                saveUserData();
+                renderExpenses();
+                renderCalendar();
+                closeEditExpenseModal();
+            }
         }
 
         function deleteExpense(index) {
@@ -2468,6 +2610,7 @@
                 expenses.splice(index, 1);
                 saveUserData();
                 renderExpenses();
+                renderCalendar();
             }
         }
 
@@ -2516,6 +2659,7 @@
                 expenses = [...initialExpenses];
                 saveUserData();
                 renderExpenses();
+                renderCalendar();
             }
         }
 
@@ -2556,6 +2700,8 @@
                 loadUserData();
             }
 
+            updateDueFieldVisibility('expense');
+
             // Add Enter key support for modal
             document.getElementById('new-username').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
@@ -2581,6 +2727,13 @@
             document.getElementById('menu-modal').addEventListener('click', (e) => {
                 if (e.target.id === 'menu-modal') {
                     closeMenuModal();
+                }
+            });
+
+            // Close edit expense modal when clicking outside
+            document.getElementById('edit-expense-modal').addEventListener('click', (e) => {
+                if (e.target.id === 'edit-expense-modal') {
+                    closeEditExpenseModal();
                 }
             });
             
