@@ -1130,7 +1130,7 @@
         /* Expenses Section */
         .expense-form {
             display: grid;
-            grid-template-columns: 2fr 1fr 1fr 110px auto;
+            grid-template-columns: 2fr 1fr 1fr 1fr 110px auto;
             gap: 10px;
             background: white;
             padding: 15px;
@@ -1181,6 +1181,19 @@
         .btn-add:hover { background: var(--primary-dark); }
 
         .expense-list { display: flex; flex-direction: column; gap: 10px; }
+
+        .expense-category-header {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-light);
+            padding: 12px 4px 2px;
+        }
+
+        .expense-category-header:first-child {
+            padding-top: 0;
+        }
 
         .expense-item {
             display: flex;
@@ -1599,6 +1612,11 @@
                     <option value="monthly">Monthly</option>
                     <option value="oneoff">One-off</option>
                 </select>
+                <select class="form-input" id="expense-category">
+                    <option value="Bill">Bill</option>
+                    <option value="Subscription">Subscription</option>
+                    <option value="Other">Other</option>
+                </select>
                 <div class="due-field-wrapper" id="expense-due-wrapper">
                     <select class="form-input due-weekday-field" id="expense-weekday" style="display:none;">
                         <option value="">Payday</option>
@@ -1637,6 +1655,11 @@
                 <option value="weekly">Weekly</option>
                 <option value="monthly">Monthly</option>
                 <option value="oneoff">One-off</option>
+            </select>
+            <select class="modal-input" id="edit-expense-category">
+                <option value="Bill">Bill</option>
+                <option value="Subscription">Subscription</option>
+                <option value="Other">Other</option>
             </select>
             <select class="modal-input due-weekday-field" id="edit-expense-weekday" style="display:none;">
                 <option value="">Defaults to payday</option>
@@ -1678,7 +1701,7 @@
         let cycleOffset = 0; // 0 = current cycle, 1 = next, -1 = previous, etc.
 
         const initialExpenses = [
-            { name: 'Example: Rent', amount: 400, frequency: 'weekly', dueDay: null, dueWeekday: null },
+            { name: 'Example: Rent', amount: 400, frequency: 'weekly', category: 'Bill', dueDay: null, dueWeekday: null },
         ];
 
         let expenses = [];
@@ -2506,64 +2529,91 @@
 
         function renderExpenses() {
             const list = document.getElementById('expenses-list');
-            list.innerHTML = expenses.map((exp, index) => {
-                let convertedAmount = exp.amount;
-                let showConverted = false;
-                
-                // Convert to current pay frequency for display
-                if (exp.frequency === 'weekly') {
-                    convertedAmount = exp.amount * 2; // to fortnightly
-                    if (payFrequency === 'monthly') convertedAmount *= 2.167;
-                    else if (payFrequency === 'weekly') convertedAmount = exp.amount;
-                    showConverted = payFrequency !== 'weekly';
-                } else if (exp.frequency === 'monthly') {
-                    convertedAmount = exp.amount / 2; // to fortnightly
-                    if (payFrequency === 'monthly') convertedAmount = exp.amount;
-                    else if (payFrequency === 'weekly') convertedAmount /= 2;
-                    showConverted = payFrequency !== 'monthly';
-                } else if (exp.frequency === 'fortnightly') {
-                    if (payFrequency === 'weekly') convertedAmount = exp.amount / 2;
-                    else if (payFrequency === 'monthly') convertedAmount = exp.amount * 2.167;
-                    showConverted = payFrequency !== 'fortnightly';
-                }
 
-                let dueDayText;
-                const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                if (exp.frequency === 'oneoff') {
-                    dueDayText = exp.dueDay ? ` • Due: ${exp.dueDay}${getDaySuffix(exp.dueDay)}` : ' • No date set';
-                } else if (exp.frequency === 'weekly') {
-                    if (exp.dueWeekday !== null && exp.dueWeekday !== undefined) {
-                        dueDayText = ` • Due: ${dayNames[exp.dueWeekday]}s`;
-                    } else {
-                        dueDayText = ' • Due: Payday';
-                    }
-                } else if (exp.frequency === 'monthly') {
-                    const day = exp.dueDay || new Date(paydayStart).getDate();
-                    dueDayText = exp.dueDay ? ` • Due: ${day}${getDaySuffix(day)}` : ` • Due: ${day}${getDaySuffix(day)} (payday date)`;
+            const categoryOrder = ['Bill', 'Subscription', 'Other'];
+            const categoryLabels = { Bill: '🧾 Bills', Subscription: '🔁 Subscriptions', Other: '📦 Other' };
+
+            // Keep each expense paired with its real array index (needed for edit/delete)
+            // so grouping/sorting for display doesn't break those references.
+            const groups = { Bill: [], Subscription: [], Other: [] };
+            expenses.forEach((exp, index) => {
+                const cat = categoryOrder.includes(exp.category) ? exp.category : 'Other';
+                groups[cat].push({ exp, index });
+            });
+
+            categoryOrder.forEach(cat => {
+                groups[cat].sort((a, b) => a.exp.name.localeCompare(b.exp.name));
+            });
+
+            let html = '';
+            categoryOrder.forEach(cat => {
+                if (groups[cat].length === 0) return;
+                html += `<div class="expense-category-header">${categoryLabels[cat]}</div>`;
+                groups[cat].forEach(({ exp, index }) => {
+                    html += renderExpenseItem(exp, index);
+                });
+            });
+
+            list.innerHTML = html || '<div style="text-align:center; color: var(--text-light); padding: 20px;">No expenses yet</div>';
+            calculateBuckets();
+        }
+
+        function renderExpenseItem(exp, index) {
+            let convertedAmount = exp.amount;
+            let showConverted = false;
+            
+            // Convert to current pay frequency for display
+            if (exp.frequency === 'weekly') {
+                convertedAmount = exp.amount * 2; // to fortnightly
+                if (payFrequency === 'monthly') convertedAmount *= 2.167;
+                else if (payFrequency === 'weekly') convertedAmount = exp.amount;
+                showConverted = payFrequency !== 'weekly';
+            } else if (exp.frequency === 'monthly') {
+                convertedAmount = exp.amount / 2; // to fortnightly
+                if (payFrequency === 'monthly') convertedAmount = exp.amount;
+                else if (payFrequency === 'weekly') convertedAmount /= 2;
+                showConverted = payFrequency !== 'monthly';
+            } else if (exp.frequency === 'fortnightly') {
+                if (payFrequency === 'weekly') convertedAmount = exp.amount / 2;
+                else if (payFrequency === 'monthly') convertedAmount = exp.amount * 2.167;
+                showConverted = payFrequency !== 'fortnightly';
+            }
+
+            let dueDayText;
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            if (exp.frequency === 'oneoff') {
+                dueDayText = exp.dueDay ? ` • Due: ${exp.dueDay}${getDaySuffix(exp.dueDay)}` : ' • No date set';
+            } else if (exp.frequency === 'weekly') {
+                if (exp.dueWeekday !== null && exp.dueWeekday !== undefined) {
+                    dueDayText = ` • Due: ${dayNames[exp.dueWeekday]}s`;
                 } else {
                     dueDayText = ' • Due: Payday';
                 }
+            } else if (exp.frequency === 'monthly') {
+                const day = exp.dueDay || new Date(paydayStart).getDate();
+                dueDayText = exp.dueDay ? ` • Due: ${day}${getDaySuffix(day)}` : ` • Due: ${day}${getDaySuffix(day)} (payday date)`;
+            } else {
+                dueDayText = ' • Due: Payday';
+            }
 
-                return `
-                <div class="expense-item">
-                    <div class="expense-details">
-                        <h4>${exp.name}</h4>
-                        <div class="expense-meta">
-                            <span class="badge badge-${exp.frequency}">${exp.frequency}</span>
-                            ${showConverted ? `<span class="converted-cost">≈ $${convertedAmount.toFixed(2)} / ${payFrequency}</span>` : ''}
-                            <span class="converted-cost">${dueDayText}</span>
-                        </div>
+            return `
+            <div class="expense-item">
+                <div class="expense-details">
+                    <h4>${exp.name}</h4>
+                    <div class="expense-meta">
+                        <span class="badge badge-${exp.frequency}">${exp.frequency}</span>
+                        ${showConverted ? `<span class="converted-cost">≈ $${convertedAmount.toFixed(2)} / ${payFrequency}</span>` : ''}
+                        <span class="converted-cost">${dueDayText}</span>
                     </div>
-                    <div class="expense-actions">
-                        <span class="expense-cost">$${exp.amount.toFixed(2)}</span>
-                        <div style="display:flex; gap:5px;">
-                            <button class="btn-icon" onclick="openEditExpenseModal(${index})">✎</button>
-                            <button class="btn-icon delete" onclick="deleteExpense(${index})">✕</button>
-                        </div>
+                </div>
+                <div class="expense-actions">
+                    <span class="expense-cost">$${exp.amount.toFixed(2)}</span>
+                    <div style="display:flex; gap:5px;">
+                        <button class="btn-icon" onclick="openEditExpenseModal(${index})">✎</button>
+                        <button class="btn-icon delete" onclick="deleteExpense(${index})">✕</button>
                     </div>
-                </div>`;
-            }).join('');
-            calculateBuckets();
+                </div>
+            </div>`;
         }
 
         function getDaySuffix(day) {
@@ -2599,6 +2649,7 @@
             const name = document.getElementById('expense-name').value;
             const amount = parseFloat(document.getElementById('expense-amount').value);
             const frequency = document.getElementById('expense-frequency').value;
+            const category = document.getElementById('expense-category').value;
             const weekdayVal = document.getElementById('expense-weekday').value;
             const dayVal = document.getElementById('expense-day').value;
 
@@ -2607,7 +2658,7 @@
             const dueWeekday = (frequency === 'weekly' && weekdayVal !== '') ? parseInt(weekdayVal) : null;
             const dueDay = (frequency === 'monthly' || frequency === 'oneoff') && dayVal ? parseInt(dayVal) : null;
 
-            expenses.push({ name, amount, frequency, dueDay, dueWeekday });
+            expenses.push({ name, amount, frequency, category, dueDay, dueWeekday });
             clearForm();
             saveUserData();
             renderExpenses();
@@ -2619,6 +2670,7 @@
             document.getElementById('expense-amount').value = '';
             document.getElementById('expense-day').value = '';
             document.getElementById('expense-weekday').value = '';
+            document.getElementById('expense-category').value = 'Bill';
             updateDueFieldVisibility('expense');
         }
 
@@ -2629,6 +2681,7 @@
             document.getElementById('edit-expense-name').value = exp.name;
             document.getElementById('edit-expense-amount').value = exp.amount;
             document.getElementById('edit-expense-frequency').value = exp.frequency;
+            document.getElementById('edit-expense-category').value = exp.category || 'Bill';
             document.getElementById('edit-expense-weekday').value = (exp.dueWeekday !== null && exp.dueWeekday !== undefined) ? exp.dueWeekday : '';
             document.getElementById('edit-expense-day').value = exp.dueDay || '';
             updateDueFieldVisibility('edit-expense');
@@ -2647,6 +2700,7 @@
             const name = document.getElementById('edit-expense-name').value;
             const amount = parseFloat(document.getElementById('edit-expense-amount').value);
             const frequency = document.getElementById('edit-expense-frequency').value;
+            const category = document.getElementById('edit-expense-category').value;
             const weekdayVal = document.getElementById('edit-expense-weekday').value;
             const dayVal = document.getElementById('edit-expense-day').value;
             
@@ -2655,7 +2709,7 @@
             const dueWeekday = (frequency === 'weekly' && weekdayVal !== '') ? parseInt(weekdayVal) : null;
             const dueDay = (frequency === 'monthly' || frequency === 'oneoff') && dayVal ? parseInt(dayVal) : null;
             
-            expenses[editingIndex] = { name, amount, frequency, dueDay, dueWeekday };
+            expenses[editingIndex] = { name, amount, frequency, category, dueDay, dueWeekday };
             saveUserData();
             renderExpenses();
             renderCalendar();
