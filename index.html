@@ -1501,6 +1501,23 @@ html[data-mode=dark] .expense-section .bill-group-heading.category-other{backgro
 #transfer-dialog{position:fixed;inset:0;margin:auto;width:min(480px,calc(100vw - 32px));height:fit-content;max-height:calc(100dvh - 40px);padding:28px;overflow:auto;border-radius:16px}#bill-preview{margin-top:20px;font-size:.82rem;line-height:1.6}
 /* Explicit padding overrides the original universal reset on native dialogues. */
 #bill-dialog,#settings-dialog,#pay-dialog{padding:28px!important}dialog .dialog-title{margin-bottom:24px!important}dialog .form-actions{gap:12px!important;padding-top:20px!important;margin-top:26px!important}dialog .form-actions button{padding:11px 20px!important;min-height:42px!important}
+
+/* Cycle navigation must fit its container without wrapping on mobile. */
+.daily .row:has(> #cycle-prev){display:grid!important;grid-template-columns:1fr 1.25fr 1fr;gap:8px!important;align-items:stretch}
+.daily #cycle-prev,.daily #cycle-now,.daily #cycle-next{width:100%;min-width:0;white-space:nowrap;justify-content:center;text-align:center;box-sizing:border-box}
+@media(max-width:480px){.daily .row:has(> #cycle-prev){gap:6px!important}.daily #cycle-prev,.daily #cycle-now,.daily #cycle-next{padding:9px 4px!important;font-size:.72rem!important;min-height:38px;line-height:1.4}}
+
+/* Keep Daily Expenses percentage and Edit control together. */
+.daily .daily-total{flex:0 0 auto;min-width:0}
+.daily .daily-total .allocation-line{display:flex!important;flex-wrap:nowrap!important;align-items:center;justify-content:flex-end;gap:8px;white-space:nowrap}
+.daily .daily-total .btn-edit-percent{flex:0 0 auto;white-space:nowrap}
+.management-name{display:flex;flex-wrap:wrap;align-items:baseline;gap:5px 10px;min-width:0}
+.management-cost{font-size:.75rem;color:var(--muted);font-weight:400;white-space:nowrap}
+@media(max-width:480px){.daily>.row:first-child{flex-wrap:nowrap!important;align-items:flex-start;gap:10px}.daily>.row:first-child>div:first-child{min-width:0;flex:1}.daily h2{font-size:1rem}.daily .daily-total .amount{font-size:1.65rem!important}.daily .daily-total .btn-edit-percent{padding:7px 9px!important;font-size:.72rem}.daily .daily-total .allocation-line{gap:6px;font-size:.8rem}}
+/* Readable mobile inputs without disabling pinch-to-zoom. */
+@media(max-width:768px){
+body dialog input:not([type=checkbox]):not([type=range]),body dialog select,body dialog textarea,body .bucket-editor textarea{font-size:16px!important;line-height:1.4!important}
+}
 </style></head><body>
 <header class="header compact-header"><h1>The Bucket Budget App</h1><nav class="header-actions" aria-label="Cloud and settings"><button id="cloud-save" type="button" title="Save to GitHub Gist" aria-label="Save to GitHub Gist">💾</button><button id="cloud-load" type="button" title="Load from GitHub Gist" aria-label="Load from GitHub Gist">📥</button><button id="settings-open" type="button" title="Settings" aria-label="Settings">⚙️</button></nav><span id="sync-text" hidden></span><span id="sync-status" hidden role="status"></span></header>
 <main class="wrap">
@@ -1566,7 +1583,7 @@ for(const [category,title] of [['Bill','🧾 Bills'],['Subscription','🔁 Subsc
  const group=entries.filter(b=>(['Bill','Subscription'].includes(b.category)?b.category:'Other')===category).sort((a,b)=>a.name.localeCompare(b.name,'en-AU'));
  if(!group.length)continue;
  list.append(textNode('h3',title,'section-heading bill-group-heading category-'+category.toLowerCase()));
- for(const bill of group){const row=textNode('div','','bill-row management-row');row.append(textNode('strong',bill.name));const btn=textNode('button','✎ Edit','bill-edit');btn.type='button';btn.setAttribute('aria-label','Edit '+bill.name);btn.onclick=()=>openBill(bill.id);row.append(btn);list.append(row)}
+ for(const bill of group){const row=textNode('div','','bill-row management-row');const nameGroup=textNode('div','','management-name');nameGroup.append(textNode('strong',bill.name));const period=bill.frequency==='weekly'?'/week':bill.frequency==='fortnightly'?'/fortnight':bill.frequency==='monthly'?'/month':' (one-off)';nameGroup.append(textNode('span',money(Math.round(bill.amount*100))+period,'management-cost'));row.append(nameGroup);const btn=textNode('button','✎ Edit','bill-edit');btn.type='button';btn.setAttribute('aria-label','Edit '+bill.name);btn.onclick=()=>openBill(bill.id);row.append(btn);list.append(row)}
 }
 if(!entries.length)list.append(textNode('p','No expenses yet. Add a bill above.','muted'));
 return total}
